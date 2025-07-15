@@ -1,0 +1,88 @@
+From 24289673d8ff78c06fc475ac9669c5db80f53ea2 Mon Sep 17 00:00:00 2001
+From: Kittiphon Chaipetch <chaipetch.p@gmail.com>
+Date: Tue, 15 Jul 2025 10:38:01 +0700
+Subject: [PATCH] Fix API endpoint paths and improve error handling in login
+ page
+
+---
+ planova/frontend/app/login/page.tsx |  6 +++++-
+ planova/frontend/lib/api/api.ts     | 28 ++++++++++++++++++----------
+ 2 files changed, 23 insertions(+), 11 deletions(-)
+
+diff --git a/planova/frontend/app/login/page.tsx b/planova/frontend/app/login/page.tsx
+index 9a67448..37e6e1c 100644
+--- a/planova/frontend/app/login/page.tsx
++++ b/planova/frontend/app/login/page.tsx
+@@ -48,7 +48,11 @@ export default function LoginPage() {
+       await login(data.email, data.password);
+       // Redirect is handled in the auth context
+     } catch (err: any) {
+-      setError(err.message || 'Invalid email or password');
++      if (typeof err === 'object' && err !== null && typeof err.message === 'string') {
++        setError(err.message);
++      } else {
++        setError('An unexpected error occurred. Please try again.');
++      }
+     } finally {
+       setIsLoading(false);
+     }
+diff --git a/planova/frontend/lib/api/api.ts b/planova/frontend/lib/api/api.ts
+index 7b5950d..6e41ece 100644
+--- a/planova/frontend/lib/api/api.ts
++++ b/planova/frontend/lib/api/api.ts
+@@ -40,10 +40,7 @@ export async function apiRequest<T = any>(
+   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+ 
+   // Prepare headers
+-  const requestHeaders: Record<string, string> = {
+-    'Content-Type': 'application/json',
+-    ...headers,
+-  };
++  const requestHeaders: Record<string, string> = { ...headers };
+ 
+   // Add authorization header if required
+   if (requiresAuth) {
+@@ -63,7 +60,13 @@ export async function apiRequest<T = any>(
+ 
+   // Add body if provided
+   if (body) {
+-    requestOptions.body = JSON.stringify(body);
++    if (body instanceof URLSearchParams) {
++      // Let the browser set the Content-Type for URLSearchParams
++      requestOptions.body = body;
++    } else {
++      requestHeaders['Content-Type'] = 'application/json';
++      requestOptions.body = JSON.stringify(body);
++    }
+   }
+ 
+   try {
+@@ -111,15 +114,20 @@ export async function apiRequest<T = any>(
+  * API endpoints for authentication
+  */
+ export const authApi = {
+-  login: (email: string, password: string) =>
+-    apiRequest<{ access_token: string; token_type: string }>('/auth/login', {
++  login: (email: string, password: string) => {
++    const body = new URLSearchParams();
++    body.append('username', email);
++    body.append('password', password);
++
++    return apiRequest<{ access_token: string; token_type: string }>('/api/v1/auth/login', {
+       method: 'POST',
+-      body: { username: email, password },
++      body,
+       requiresAuth: false,
+-    }),
++    });
++  },
+ 
+   register: (email: string, password: string) =>
+-    apiRequest<{ message: string }>('/auth/register', {
++    apiRequest<{ message: string }>('/api/v1/auth/register', {
+       method: 'POST',
+       body: { email, password },
+       requiresAuth: false,
+-- 
+2.47.1.windows.1
+
