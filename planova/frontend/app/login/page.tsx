@@ -48,7 +48,11 @@ export default function LoginPage() {
       await login(data.email, data.password);
       // Redirect is handled in the auth context
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+      if (typeof err === 'object' && err !== null && typeof err.message === 'string') {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

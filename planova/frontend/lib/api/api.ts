@@ -40,10 +40,7 @@ export async function apiRequest<T = any>(
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   // Prepare headers
-  const requestHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...headers,
-  };
+  const requestHeaders: Record<string, string> = { ...headers };
 
   // Add authorization header if required
   if (requiresAuth) {
@@ -63,7 +60,13 @@ export async function apiRequest<T = any>(
 
   // Add body if provided
   if (body) {
-    requestOptions.body = JSON.stringify(body);
+    if (body instanceof URLSearchParams) {
+      // Let the browser set the Content-Type for URLSearchParams
+      requestOptions.body = body;
+    } else {
+      requestHeaders['Content-Type'] = 'application/json';
+      requestOptions.body = JSON.stringify(body);
+    }
   }
 
   try {
@@ -111,15 +114,20 @@ export async function apiRequest<T = any>(
  * API endpoints for authentication
  */
 export const authApi = {
-  login: (email: string, password: string) =>
-    apiRequest<{ access_token: string; token_type: string }>('/auth/login', {
+  login: (email: string, password: string) => {
+    const body = new URLSearchParams();
+    body.append('username', email);
+    body.append('password', password);
+
+    return apiRequest<{ access_token: string; token_type: string }>('/api/v1/auth/login', {
       method: 'POST',
-      body: { username: email, password },
+      body,
       requiresAuth: false,
-    }),
+    });
+  },
 
   register: (email: string, password: string) =>
-    apiRequest<{ message: string }>('/auth/register', {
+    apiRequest<{ message: string }>('/api/v1/auth/register', {
       method: 'POST',
       body: { email, password },
       requiresAuth: false,
